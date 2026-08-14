@@ -1,6 +1,6 @@
 FROM node:20-alpine
 
-# Dependencies for Puppeteer (Chromium) and Sharp
+# Dependencies for Puppeteer (Chromium), Sharp, and Prisma
 RUN apk add --no-cache \
       chromium \
       nss \
@@ -9,7 +9,8 @@ RUN apk add --no-cache \
       harfbuzz \
       ca-certificates \
       ttf-freefont \
-      vips-dev
+      vips-dev \
+      openssl
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
