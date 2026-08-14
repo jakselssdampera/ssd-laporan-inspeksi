@@ -1,21 +1,34 @@
 /**
  * storage.js
- * localStorage & sessionStorage operations for workshop info,
+ * API-backed storage with in-memory cache for workshop info,
  * current report data, and login session management.
+ * 
+ * Report data: stored in MongoDB via backend API
+ * Workshop info: still in localStorage (rarely changes)
+ * Theme/Session: still in localStorage/sessionStorage
  */
 
 const STORAGE_KEYS = {
-  REPORT: 'cir_current_report',
   WORKSHOP: 'cir_workshop_info',
   SESSION: 'cir_session',
   THEME: 'cir_theme'
 };
+
+// Backend API base URL (auto-detect based on current hostname)
+const API_BASE = window.location.protocol + '//' + window.location.hostname + ':3001';
 
 // ─── In-memory cache (cache-first pattern) ───────────────────────────
 let _cache = {
   workshop: null,
   report: null
 };
+
+// Current report MongoDB _id
+let _currentReportId = null;
+
+// Debounce timer for write-behind saves
+let _saveTimer = null;
+const SAVE_DEBOUNCE_MS = 1000;
 
 // ─── Theme Management ──────────────────────────────────────────────────
 
@@ -54,7 +67,7 @@ function safeJSONStringify(obj) {
   }
 }
 
-// ─── Workshop Info ───────────────────────────────────────────────────
+// ─── Workshop Info (still localStorage) ──────────────────────────────
 
 function loadWorkshopInfo() {
   if (_cache.workshop) return _cache.workshop;
@@ -83,7 +96,7 @@ function saveWorkshopInfo(data) {
   }
 }
 
-// ─── Current Report ──────────────────────────────────────────────────
+// ─── Current Report (MongoDB via API) ────────────────────────────────
 
 function createEmptyReport() {
   const inspections = {};
@@ -107,41 +120,103 @@ function createEmptyReport() {
   };
 }
 
-function loadReport() {
+/**
+ * Load report from backend API (async).
+ * Uses cache-first: if cache exists, return immediately.
+ * On first call, fetches from MongoDB.
+ */
+async function loadReport() {
   if (_cache.report) return _cache.report;
 
-  const stored = localStorage.getItem(STORAGE_KEYS.REPORT);
-  if (stored) {
-    _cache.report = safeJSONParse(stored);
-    if (_cache.report) return _cache.report;
+  try {
+    const res = await fetch(`${API_BASE}/api/reports/current`);
+    if (!res.ok) throw new Error('Failed to fetch current report');
+    
+    const report = await res.json();
+    _currentReportId = report._id;
+    
+    // Ensure inspections structure exists (new reports from DB may be empty)
+    if (!report.inspections || Object.keys(report.inspections).length === 0) {
+      report.inspections = createEmptyReport().inspections;
+      // Persist the initial structure
+      _cache.report = report;
+      _flushToBackend();
+    }
+    
+    _cache.report = report;
+    return _cache.report;
+  } catch (err) {
+    console.error('[Storage] Failed to load report from API:', err);
+    // Fallback: create an empty report in memory
+    _cache.report = createEmptyReport();
+    return _cache.report;
   }
+}
 
+/**
+ * Synchronous version for code that can't be async.
+ * Returns cached report. Must call loadReport() at least once before this.
+ */
+function loadReportSync() {
+  if (_cache.report) return _cache.report;
+  // If somehow called before async load, return empty
+  console.warn('[Storage] loadReportSync called before async load. Returning empty report.');
   _cache.report = createEmptyReport();
   return _cache.report;
 }
 
+/**
+ * Save report: update cache immediately, then debounce-flush to backend.
+ */
 function saveReport(data) {
   if (!data) return;
   data.updatedAt = new Date().toISOString();
   _cache.report = data;
 
-  const json = safeJSONStringify(data);
-  if (json) {
-    try {
-      localStorage.setItem(STORAGE_KEYS.REPORT, json);
-    } catch (e) {
-      if (e.name === 'QuotaExceededError') {
-        console.error('[Storage] localStorage quota exceeded. Consider reducing photo quality.');
-        showToast('Penyimpanan penuh! Kurangi jumlah foto.', 'danger');
-      } else {
-        console.error('[Storage] Failed to save report:', e);
-      }
+  // Debounced write-behind to MongoDB
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => _flushToBackend(), SAVE_DEBOUNCE_MS);
+}
+
+/**
+ * Flush cached report to backend via PATCH.
+ */
+async function _flushToBackend() {
+  if (!_currentReportId || !_cache.report) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/reports/${_currentReportId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: _cache.report.customer,
+        inspections: _cache.report.inspections,
+        summary: _cache.report.summary
+      })
+    });
+
+    if (!res.ok) {
+      console.error('[Storage] Failed to save report to backend');
     }
+  } catch (err) {
+    console.error('[Storage] Network error saving report:', err);
+    showToast('Gagal menyimpan ke server. Periksa koneksi.', 'danger');
   }
 }
 
+/**
+ * Force immediate flush (useful before PDF generation).
+ */
+async function flushReportNow() {
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+  }
+  await _flushToBackend();
+}
+
 function updateReportField(path, value) {
-  const report = loadReport();
+  const report = loadReportSync();
   const keys = path.split('.');
   let obj = report;
 
@@ -155,12 +230,46 @@ function updateReportField(path, value) {
   return report;
 }
 
-function resetReport() {
-  _cache.report = null;
-  localStorage.removeItem(STORAGE_KEYS.REPORT);
-  _cache.report = createEmptyReport();
-  saveReport(_cache.report);
-  return _cache.report;
+/**
+ * Reset report: create new in MongoDB, deactivate old one.
+ */
+async function resetReport() {
+  try {
+    // Flush any pending changes first
+    await flushReportNow();
+
+    const res = await fetch(`${API_BASE}/api/reports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!res.ok) throw new Error('Failed to create new report');
+
+    const newReport = await res.json();
+    _currentReportId = newReport._id;
+
+    // Initialize inspections structure
+    newReport.inspections = createEmptyReport().inspections;
+    _cache.report = newReport;
+
+    // Persist the initial structure
+    await _flushToBackend();
+
+    return _cache.report;
+  } catch (err) {
+    console.error('[Storage] Failed to reset report:', err);
+    showToast('Gagal mereset report. Periksa koneksi server.', 'danger');
+    // Fallback to local reset
+    _cache.report = createEmptyReport();
+    return _cache.report;
+  }
+}
+
+/**
+ * Get the current report's MongoDB _id.
+ */
+function getReportId() {
+  return _currentReportId;
 }
 
 // ─── Login Session ───────────────────────────────────────────────────
@@ -192,7 +301,7 @@ function logout() {
 // ─── Derived State Helpers ───────────────────────────────────────────
 
 function getInspectionStats() {
-  const report = loadReport();
+  const report = loadReportSync();
   const stats = { good: 0, warning: 0, danger: 0, unchecked: 0, total: 0 };
 
   INSPECTION_CATEGORIES.forEach(cat => {
@@ -208,7 +317,7 @@ function getInspectionStats() {
 }
 
 function getCategoryStats(categoryId) {
-  const report = loadReport();
+  const report = loadReportSync();
   const stats = { good: 0, warning: 0, danger: 0, unchecked: 0, total: 0 };
   const catData = report.inspections ? report.inspections[categoryId] : undefined;
 

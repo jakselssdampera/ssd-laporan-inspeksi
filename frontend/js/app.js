@@ -76,7 +76,10 @@ function initLoginForm() {
 
 // ─── Bootstrap App ───────────────────────────────────────────────────
 
-function bootstrapApp() {
+async function bootstrapApp() {
+  // Load report from MongoDB (async)
+  await loadReport();
+
   // Load & render workshop header
   const workshop = loadWorkshopInfo();
   
@@ -183,9 +186,9 @@ function initGlobalActions() {
       showConfirmModal(
         'Reset Report',
         'Semua data inspeksi akan dihapus dan form akan dikosongkan. Lanjutkan?',
-        () => {
-          resetReport();
-          bootstrapApp();
+        async () => {
+          await resetReport();
+          await bootstrapApp();
           showToast('Report berhasil direset.', 'info');
         }
       );

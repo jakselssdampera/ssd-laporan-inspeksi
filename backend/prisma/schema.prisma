@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Report {
+  id          String   @id @default(uuid()) @db.Uuid
+  customer    Json     @default("{}")
+  inspections Json     @default("{}")
+  summary     Json     @default("{}")
+  pdfPath     String?
+  isCurrent   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  files       InspectionFile[]
+
+  @@index([isCurrent])
+}
+
+model InspectionFile {
+  id           String   @id @default(uuid()) @db.Uuid
+  reportId     String?  @db.Uuid
+  report       Report?  @relation(fields: [reportId], references: [id])
+  fileName     String
+  mimeType     String
+  fileSize     Int
+  fileData     Bytes
+
+  createdAt    DateTime @default(now())
+
+  @@index([reportId])
+}

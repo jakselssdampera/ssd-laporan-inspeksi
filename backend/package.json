@@ -1,20 +1,26 @@
 {
-  "name": "ssd-pdf-service",
+  "name": "ssd-inspection-backend",
   "version": "1.0.0",
-  "description": "Backend PDF generation service for SSD Inspection Report",
+  "description": "Backend for Web Car Inspection Report",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "worker": "node worker.js",
-    "dev": "node --watch server.js & node --watch worker.js"
+    "generate": "prisma generate"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
+    "@fastify/multipart": "^9.0.0",
+    "@fastify/static": "^8.0.0",
+    "@prisma/client": "^5.18.0",
     "bullmq": "^5.23.0",
     "fastify": "^5.0.0",
-    "@fastify/static": "^8.0.0",
     "ioredis": "^5.4.1",
     "puppeteer": "^23.4.1",
+    "sharp": "^0.33.5",
     "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "prisma": "^5.18.0"
   }
 }

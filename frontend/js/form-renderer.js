@@ -11,7 +11,7 @@ function renderCustomerForm() {
   const container = document.getElementById('customer-fields');
   if (!container) return;
 
-  const report = loadReport();
+  const report = loadReportSync();
 
   container.innerHTML = CUSTOMER_FIELDS.map(field => {
     const value = (report.customer && report.customer[field.id]) ? report.customer[field.id] : '';
@@ -94,7 +94,7 @@ function renderCategoryBadges(stats) {
 // ─── Render Single Inspection Item ───────────────────────────────────
 
 function renderInspectionItem(categoryId, item) {
-  const report = loadReport();
+  const report = loadReportSync();
   const catData = report.inspections && report.inspections[categoryId] ? report.inspections[categoryId] : null;
   const data = (catData && catData[item.id]) ? catData[item.id] : { status: 'unchecked', note: '', photos: [] };
   const hasPhotos = data.photos && data.photos.length > 0 && data.photos.some(p => p !== null);
@@ -193,7 +193,7 @@ function initInspectionEvents() {
     cat.items.forEach(item => {
       const photosContainer = document.getElementById(`photos-${item.id}`);
       if (photosContainer) {
-        const report = loadReport();
+        const report = loadReportSync();
         const catData = report.inspections && report.inspections[cat.id] ? report.inspections[cat.id] : null;
         const photos = (catData && catData[item.id] && catData[item.id].photos) ? catData[item.id].photos : [];
 
@@ -262,7 +262,7 @@ function renderSummaryForm() {
   const container = document.getElementById('summary-fields');
   if (!container) return;
 
-  const report = loadReport();
+  const report = loadReportSync();
 
   container.innerHTML = SUMMARY_FIELDS.map(field => {
     const value = (report.summary && report.summary[field.id]) ? report.summary[field.id] : '';
@@ -297,7 +297,7 @@ function renderSummaryForm() {
 // ─── Progress Bar ────────────────────────────────────────────────────
 
 window.updateProgressBar = function() {
-  const report = loadReport();
+  const report = loadReportSync();
   const inspections = report.inspections || {};
   let totalItems = 0;
   let completedItems = 0;

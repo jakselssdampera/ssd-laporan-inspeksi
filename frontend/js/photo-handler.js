@@ -121,10 +121,10 @@ function renderUploadDropzone(slotEl, itemId, slotIndex) {
   if (window.lucide) lucide.createIcons({ nodes: [slotEl] });
 }
 
-function renderPhotoPreview(slotEl, itemId, slotIndex, base64) {
+function renderPhotoPreview(slotEl, itemId, slotIndex, photoUrl) {
   slotEl.innerHTML = `
     <div class="photo-preview">
-      <img src="${base64}" alt="Foto ${itemId} slot ${slotIndex + 1}"
+      <img src="${photoUrl}" alt="Foto ${itemId} slot ${slotIndex + 1}"
            class="photo-thumbnail" loading="lazy">
       <button type="button" class="photo-delete-btn" 
               aria-label="Hapus foto ${itemId} slot ${slotIndex + 1}"
@@ -136,7 +136,7 @@ function renderPhotoPreview(slotEl, itemId, slotIndex, base64) {
 
   // Click thumbnail to open lightbox
   const thumbnail = slotEl.querySelector('.photo-thumbnail');
-  thumbnail.addEventListener('click', () => openLightbox(base64, `${itemId} - Foto ${slotIndex + 1}`));
+  thumbnail.addEventListener('click', () => openLightbox(photoUrl, `${itemId} - Foto ${slotIndex + 1}`));
   thumbnail.style.cursor = 'pointer';
 
   // Delete button
@@ -151,24 +151,57 @@ function renderPhotoPreview(slotEl, itemId, slotIndex, base64) {
 
 // ─── Upload Handler ──────────────────────────────────────────────────
 
+// Helper to convert base64 to Blob
+function base64ToBlob(base64, mime) {
+  const byteString = atob(base64.split(',')[1]);
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  return new Blob([ab], { type: mime });
+}
+
 async function handlePhotoUpload(slotEl, itemId, slotIndex, file) {
   try {
     slotEl.classList.add('photo-loading');
     const base64 = await compressImage(file);
+    
+    // Convert base64 to Blob for FormData
+    const blob = base64ToBlob(base64, 'image/jpeg');
+    const formData = new FormData();
+    formData.append('file', blob, `${itemId}_${slotIndex}.jpg`);
 
-    // Save to report
-    const report = loadReport();
+    const reportId = getReportId();
+    if (reportId) {
+      formData.append('reportId', reportId);
+    }
+
+    // Upload to backend
+    const backendUrl = window.location.protocol + '//' + window.location.hostname + ':3001';
+    const response = await fetch(`${backendUrl}/api/upload`, {
+      method: 'POST',
+      body: formData // fetch automatically sets Content-Type to multipart/form-data with boundary
+    });
+    
+    if (!response.ok) throw new Error('Gagal mengupload foto ke server');
+    
+    const { url } = await response.json();
+    const finalUrl = `${backendUrl}${url}`;
+
+    // Save to report cache & flush to MongoDB
+    const report = loadReportSync();
     const catId = itemId.charAt(0);
     if (report.inspections[catId] && report.inspections[catId][itemId]) {
       if (!report.inspections[catId][itemId].photos) {
         report.inspections[catId][itemId].photos = [];
       }
-      report.inspections[catId][itemId].photos[slotIndex] = base64;
+      report.inspections[catId][itemId].photos[slotIndex] = finalUrl;
       saveReport(report);
     }
 
     // Re-render as preview
-    renderPhotoPreview(slotEl, itemId, slotIndex, base64);
+    renderPhotoPreview(slotEl, itemId, slotIndex, finalUrl);
     slotEl.classList.remove('photo-loading');
     showToast('Foto berhasil diupload', 'good');
   } catch (err) {
@@ -180,7 +213,7 @@ async function handlePhotoUpload(slotEl, itemId, slotIndex, file) {
 // ─── Delete Handler ──────────────────────────────────────────────────
 
 function handlePhotoDelete(slotEl, itemId, slotIndex) {
-  const report = loadReport();
+  const report = loadReportSync();
   const catId = itemId.charAt(0);
   const catData = report.inspections && report.inspections[catId] ? report.inspections[catId] : null;
   if (catData && catData[itemId] && catData[itemId].photos) {

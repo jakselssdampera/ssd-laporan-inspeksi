@@ -15,17 +15,25 @@ async function generatePDF() {
   }
 
   try {
-    const report = loadReport();
+    // Flush any pending changes to MongoDB before generating PDF
+    await flushReportNow();
+
+    const report = loadReportSync();
     const workshop = loadWorkshopInfo();
+    const reportId = getReportId();
+
+    if (!reportId) {
+      throw new Error('Report belum tersimpan di database');
+    }
     
     // Automatically detect backend URL based on current server IP
     const backendUrl = window.location.protocol + '//' + window.location.hostname + ':3001';
     
-    // Request backend to generate PDF
+    // Request backend to generate PDF (send reportId, worker will fetch from DB)
     const response = await fetch(`${backendUrl}/api/pdf/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ report, workshop })
+      body: JSON.stringify({ reportId, workshop })
     });
 
     if (!response.ok) throw new Error('Failed to request PDF generation');
@@ -86,7 +94,7 @@ function showPDFPreview() {
   
   if (!modal || !container) return;
 
-  const report = loadReport();
+  const report = loadReportSync();
   const workshop = loadWorkshopInfo();
   const pdfContent = buildPDFContent(report, workshop);
 
