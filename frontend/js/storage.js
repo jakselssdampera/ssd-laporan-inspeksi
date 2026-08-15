@@ -15,7 +15,7 @@ const STORAGE_KEYS = {
 };
 
 // Backend API base URL (auto-detect based on current hostname)
-const API_BASE = window.location.protocol + '//' + window.location.hostname + ':3001';
+const API_BASE = ''; // NGINX reverse proxies /api/
 
 // ─── In-memory cache (cache-first pattern) ───────────────────────────
 let _cache = {

@@ -178,7 +178,7 @@ async function handlePhotoUpload(slotEl, itemId, slotIndex, file) {
     }
 
     // Upload to backend
-    const backendUrl = window.location.protocol + '//' + window.location.hostname + ':3001';
+    const backendUrl = ''; // NGINX proxies /api/
     const response = await fetch(`${backendUrl}/api/upload`, {
       method: 'POST',
       body: formData // fetch automatically sets Content-Type to multipart/form-data with boundary

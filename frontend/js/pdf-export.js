@@ -27,7 +27,7 @@ async function generatePDF() {
     }
     
     // Automatically detect backend URL based on current server IP
-    const backendUrl = window.location.protocol + '//' + window.location.hostname + ':3001';
+    const backendUrl = ''; // NGINX proxies /api/
     
     // Request backend to generate PDF (send reportId, worker will fetch from DB)
     const response = await fetch(`${backendUrl}/api/pdf/generate`, {
