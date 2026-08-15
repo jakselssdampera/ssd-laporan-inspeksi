@@ -5,10 +5,11 @@
  */
 
 // ─── Login Credentials (client-side only) ────────────────────────────
-const AUTH_CREDENTIALS = {
-  username: 'admin',
-  password: 'admin123'
-};
+const AUTH_CREDENTIALS = [
+  { username: 'admin', password: 'admin123' },
+  { username: 'mekanik1', password: 'mekanikampera' },
+  { username: 'mekanik2', password: 'mekanikhebat' }
+];
 
 // ─── Default Workshop Info ───────────────────────────────────────────
 const DEFAULT_WORKSHOP = {

@@ -287,7 +287,10 @@ function setLoggedIn(val) {
 }
 
 function authenticate(username, password) {
-  if (username === AUTH_CREDENTIALS.username && password === AUTH_CREDENTIALS.password) {
+  const match = AUTH_CREDENTIALS.some(
+    acc => acc.username === username && acc.password === password
+  );
+  if (match) {
     setLoggedIn(true);
     return true;
   }
