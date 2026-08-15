@@ -94,18 +94,25 @@ function showPDFPreview() {
   
   if (!modal || !container) return;
 
-  const report = loadReportSync();
-  const workshop = loadWorkshopInfo();
-  const pdfContent = buildPDFContent(report, workshop);
+  try {
+    container.innerHTML = '<p style="text-align:center;padding:2rem;color:#888;">Memuat preview...</p>';
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
 
-  // Set content inside the container
-  container.innerHTML = pdfContent;
+    const report = loadReportSync();
+    const workshop = loadWorkshopInfo();
+    const pdfContent = buildPDFContent(report, workshop);
 
-  // Show modal
-  modal.classList.remove('hidden');
-  
-  // Disable body scroll
-  document.body.style.overflow = 'hidden';
+    // Use requestAnimationFrame to prevent UI blocking
+    requestAnimationFrame(() => {
+      container.innerHTML = pdfContent;
+    });
+  } catch (err) {
+    console.error('[Preview] Failed to render preview:', err);
+    container.innerHTML = '<p style="text-align:center;padding:2rem;color:#f44;">Gagal merender preview. Silakan coba lagi.</p>';
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
 }
 
 function hidePDFPreview() {
