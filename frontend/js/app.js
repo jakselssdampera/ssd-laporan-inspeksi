@@ -83,8 +83,8 @@ async function bootstrapApp() {
   // Load & render workshop header
   const workshop = loadWorkshopInfo();
   
-  // Force update old logo path to base64 to prevent PDF generation crash
-  if (workshop.logo === './Assets/logo.png' && DEFAULT_WORKSHOP.logo.startsWith('data:image')) {
+  // Force update logo path to the configured default logo (Assets/logo.png)
+  if (workshop.logo !== DEFAULT_WORKSHOP.logo) {
     workshop.logo = DEFAULT_WORKSHOP.logo;
     saveWorkshopInfo(workshop);
   }
