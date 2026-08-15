@@ -133,7 +133,7 @@ async function loadReport() {
     if (!res.ok) throw new Error('Failed to fetch current report');
     
     const report = await res.json();
-    _currentReportId = report._id;
+    _currentReportId = report.id;
     
     // Ensure inspections structure exists (new reports from DB may be empty)
     if (!report.inspections || Object.keys(report.inspections).length === 0) {
@@ -246,7 +246,7 @@ async function resetReport() {
     if (!res.ok) throw new Error('Failed to create new report');
 
     const newReport = await res.json();
-    _currentReportId = newReport._id;
+    _currentReportId = newReport.id;
 
     // Initialize inspections structure
     newReport.inspections = createEmptyReport().inspections;
