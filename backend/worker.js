@@ -98,6 +98,36 @@ const worker = new Worker('pdf-generation', async (job) => {
 
     console.log(`[Job ${job.id}] PDF successfully saved to database with File ID: ${fileRecord.id}`);
 
+    // Upload to Nextcloud (non-blocking / asynchronous upload)
+    const uploadToNextcloud = async () => {
+      try {
+        const nextcloudToken = 'zpc2LkfcyXzKGqY';
+        const nextcloudUrl = `https://nc.ssdampera.web.id/nextcloud/public.php/webdav/${encodeURIComponent(fileName)}`;
+        const authHeader = 'Basic ' + Buffer.from(nextcloudToken + ':').toString('base64');
+
+        console.log(`[Job ${job.id}] Uploading PDF to Nextcloud...`);
+        const ncResponse = await fetch(nextcloudUrl, {
+          method: 'PUT',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/pdf'
+          },
+          body: pdfBuffer
+        });
+
+        if (!ncResponse.ok) {
+          console.error(`[Job ${job.id}] Nextcloud WebDAV upload failed: ${ncResponse.status} ${ncResponse.statusText}`);
+        } else {
+          console.log(`[Job ${job.id}] PDF successfully uploaded to Nextcloud folder!`);
+        }
+      } catch (ncError) {
+        console.error(`[Job ${job.id}] Error uploading PDF to Nextcloud:`, ncError);
+      }
+    };
+
+    // Run in background without blocking the worker response
+    uploadToNextcloud().catch(err => console.error('Failed Nextcloud upload promise:', err));
+
     // Return fileId so the backend can respond with the URL
     return { fileId: fileRecord.id };
   } catch (error) {
